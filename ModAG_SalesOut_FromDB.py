@@ -13,8 +13,10 @@ nowStr=datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 print("TodayStr's date:", todayStr,' -- ',type(todayStr))
 print("nowStr's date:", nowStr,' -- ',type(nowStr))
 
-twoMonthBeforeStr=(date.today()-relativedelta(month=2)).strftime('%Y%m')
-threeMonthBeforeStr=(date.today()-relativedelta(month=3)).strftime('%Y%m')
+twoMonthBeforeStr=(date.today()-relativedelta(months=2)).strftime('%Y%m')
+threeMonthBeforeStr=(date.today()-relativedelta(months=3)).strftime('%Y%m')
+
+print(twoMonthBeforeStr, ' ==two three==  ',threeMonthBeforeStr)
 
 file_path='C:\\Users\\70018928\\Documents\\Project2021\\Experiment\\SqlFromDataFrame\\'
 
@@ -69,7 +71,7 @@ def ReadFCT_SALE_SIS(twoMonthBeforeStr):
 
             SELECT * FROM  [SalesSupport_ETL].[dbo].[FCT_SALE_SIS] 
             WHERE [SOLDTO_CUS_CATEGORY_GRP] = 'Agent / Sub Agent' 
-            AND SALE_MONTH >= '"""+str(twoMonthBeforeStr)+"""' -- 201809
+            AND SALE_MONTH >= """+str(twoMonthBeforeStr)+""" -- 201809
             --AND SALE_MONTH = 201809 
 
     """
@@ -99,7 +101,7 @@ def ReadTemp_ETL_Check_Stock(threeMonthBeforeStr):
 
             SELECT * FROM  [SalesSupport_ETL].[dbo].[Temp_ETL_Check_Stock] 
             WHERE 1=1 
-            AND ([Year]*100)+[Month] >=  '"""+str(threeMonthBeforeStr)+"""'   --201809 -1 
+            AND ([Year]*100)+[Month] >=  """+str(threeMonthBeforeStr)+"""   --201809 -1 
             --AND ([Year]*100)+[Month] >= 201809 -1 
 	        --AND ([Year]*100)+[Month] <= 201810 
 
@@ -307,7 +309,7 @@ q1 = """
     LEFT JOIN DIM_PRODUCT P on A.PRD_PARENT_LABEL = P.SKU_LABEL
     WHERE A.[SOLDTO_CUS_CATEGORY_GRP] = 'Agent / Sub Agent'  -- filter only TT Channel
     --AND P.PROD_CATG in ('Beer','Spirits') --.PRD_CATEGORY = 'BEER' -- filter only Beer
-     AND A.SALE_MONTH >=  '"""+str(twoMonthBeforeStr)+"""'   --201809
+     AND A.SALE_MONTH >=  """+str(twoMonthBeforeStr)+"""   --201809
     --AND A.SALE_MONTH = 201809
     -- AND A.[SOLDTO_LABEL] IN ('1002979', '1003175','1007344') TEST FOR หจก.สมพงษ์การสุรา, บจก.นีโอ เอส กรุ๊ป, ร้านโชคดี 4545
     GROUP BY A.[SALE_MONTH]
@@ -366,7 +368,7 @@ q1 = """
     WHERE 1=1
         --AND P.PROD_CATG in ('Beer','Spirits')
         --(S.SURVEY_TYPE = 2 OR P.PROD_CATG = 'Beer') -- Filter only Beer
-         AND (S.[Year]*100)+S.[Month] >=  '"""+str(threeMonthBeforeStr)+"""'  --201809 -1 -- เผื่อ begining stock ให้ ลบเพิ่มอีก 1 month (ยังไม่ได้แก้กรณี เดือน 1)
+         AND (S.[Year]*100)+S.[Month] >=  """+threeMonthBeforeStr+"""  --201809 -1 -- เผื่อ begining stock ให้ ลบเพิ่มอีก 1 month (ยังไม่ได้แก้กรณี เดือน 1)
         --AND (S.[Year]*100)+S.[Month] >= 201809 -1 
 	    --AND (S.[Year]*100)+S.[Month] <= 201810 
     --	AND S.CUS_CODE IN ('0001002979', '0001003175','0001007344', '0682000353','0212000717','0642000124')  --TEST FOR หจก.สมพงษ์การสุรา, บจก.นีโอ เอส กรุ๊ป, ร้านโชคดี 4545
@@ -544,7 +546,7 @@ q1 = """
 		LEFT JOIN BUYIN_SUB_Temp INSUB ON I.AGENT_CODE = INSUB.AGENT_CODE AND I.SALE_MONTH = INSUB.YYYYMM AND I.PRD_BRAND = INSUB.PRD_BRAND 
 		
 		WHERE 1=1  --C.CUST_TYPE in ('Agent','Super Sub-agent')
-				AND I.SALE_MONTH >=  '"""+str(twoMonthBeforeStr)+"""'  -- 201809
+				AND I.SALE_MONTH >=  """+str(twoMonthBeforeStr)+"""  -- 201809
 				AND I.ACTL_BUYIN_CASE > 0
 				AND I.AGENT_CODE is not null
 		GROUP BY  I.AGENT_CODE
@@ -713,7 +715,7 @@ Output['collected_at']=nowStr
 
 # check1=Output.copy()
 # check1.to_csv(file_path+'check1.csv')
-monthStr=(date.today()-relativedelta(month=1)).strftime('%Y%m')
+monthStr=(date.today()-relativedelta(months=1)).strftime('%Y%m')
 datenow=monthStr
 print(' ==> ',datenow)
 #datenow='201809'
