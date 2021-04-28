@@ -323,7 +323,6 @@ print(BUYIN_AGENT.columns, ' ----- ',len(BUYIN_AGENT),' :::  ',BUYIN_AGENT.tail(
 # print(check)
 # check.to_csv(file_path+'check.csv')
 
-
 def SetT1Group_2(x, y):
     if(int(x[8:len(x)])<=10):
         return y
@@ -339,7 +338,6 @@ def SetT3Group_2(x, y):
         return y
     else:
         return 0
-
 
 Temp_ETL_Check_Stock['T1']=Temp_ETL_Check_Stock.apply(lambda x: SetT1Group_2(x['DATE'],x['ACT_CASE']),axis=1)
 Temp_ETL_Check_Stock['T2']=Temp_ETL_Check_Stock.apply(lambda x: SetT2Group_2(x['DATE'],x['ACT_CASE']),axis=1)
@@ -381,11 +379,9 @@ q1 = """
 
 STOCK_DETAIL=ps.sqldf(q1, locals())
 print(STOCK_DETAIL.columns, ' ----- ',len(STOCK_DETAIL),' :::  ',STOCK_DETAIL.tail(10))
-
 # check=STOCK_DETAIL[['YYYYMM','CUST_CODE','T1','T2','T3','T1_STOCK_CASE','T2_STOCK_CASE','T3_STOCK_CASE']]
 # print(check)
 # check.to_csv(file_path+'check.csv')
-
 
 def ScreenAgentCode_TempETLSubagentSales(x):
     if(x =='' or x is None):
@@ -471,8 +467,6 @@ q1 = """
 
 DIM_CUSTOMER=ps.sqldf(q1, locals())
 print(DIM_CUSTOMER.columns, ' ----- ',len(DIM_CUSTOMER),' :::  ',DIM_CUSTOMER.tail(10))
-
-
 # check1=DIM_CUSTOMER.copy()
 # check1.to_csv(file_path+'check1.csv')
 
@@ -495,10 +489,8 @@ q1 = """
         """
 BEG_STOCK_temp=ps.sqldf(q1, locals())
 print(BEG_STOCK_temp.columns, ' --BEG STOCK--- ',len(BEG_STOCK_temp),' :::  ',BEG_STOCK_temp.tail(10))
-
 # check1=BEG_STOCK_temp.copy()
 # check1.to_csv(file_path+'check_stock.csv')
-
 
 q1 = """
         select YYYYMM, AGENT_CODE, PROD_CATG, PRD_BRAND, sum(BUYIN_SUB_CASE) SUB_BUY_IN
@@ -566,10 +558,8 @@ q1 = """
 
 AGENT_DETL_Temp=ps.sqldf(q1, locals())
 print(AGENT_DETL_Temp.columns, ' ---AG DT Temp-- ',len(AGENT_DETL_Temp),' :::  ',AGENT_DETL_Temp.tail(10))
-
 # check1=AGENT_DETL_Temp.copy()
 # check1.to_csv(file_path+'check.csv')
-
 
 def checknull(tin):
     if(tin is None):
@@ -663,7 +653,6 @@ print(AGENT_DETL.columns, ' ---AG DT-- ',len(AGENT_DETL),' :::  ',AGENT_DETL.tai
 
 
 #------------------------- Final Select Output ------------------------
-
 def ParseProvinceName(x):
     if(x=='Phrachuap Khiri Khan'):
         return 'Prachuap Khiri Khan'
@@ -674,7 +663,6 @@ def CreateSale_Out_Agent_Other(x, y):
         return 0
     else:
         return x-y
-    
 def CreateSale_Out_Agent_Other_Flg(x, y):
     #print(' check x-y', x, ' : ',y ,' ==> ',x-y)
     if( ((x-y) is None) or (x-y)==np.nan ):
@@ -686,11 +674,9 @@ def CreateSale_Out_Agent_Other_Flg(x, y):
     else:
         return '-'
 
-
 AGENT_DETL['PROVINCE']=AGENT_DETL.apply(lambda x: ParseProvinceName(x['REGION_SALE_PRV']),axis=1 )
 AGENT_DETL['SALE_OUT_AGENT_OTHER']=AGENT_DETL.apply(lambda x: CreateSale_Out_Agent_Other(x['AG_SALE_OUT'],x['SUB_BUY_IN']),axis=1 )
 AGENT_DETL['AG_SALE_OUT_OTHER_FLG']=AGENT_DETL.apply(lambda x: CreateSale_Out_Agent_Other_Flg(x['AG_SALE_OUT'],x['SUB_BUY_IN']),axis=1 )
-
 
 q1 = """
     SELECT A.YYYYMM AS YEAR_MONTH
@@ -761,6 +747,7 @@ check1.to_csv(file_path+'check1.csv')
 
 #Write_data_to_database(dfResult)
 
+del DIM_PRODUCT, FCT_SALE_SIS, Temp_ETL_Check_Stock, Temp_ETL_SubAgentSales, BUYIN_AGENT, STOCK_DETAIL, BUYIN_SUB, DIM_CUSTOMER, BEG_STOCK_temp, BUYIN_SUB_Temp, AGENT_DETL_Temp, AGENT_DETL, Output, dfResult
 
 ###****************************************************************
 end_datetime = datetime.now()
@@ -772,7 +759,7 @@ print('Time_use : ',round(DIFFTIMEMIN,2), ' Seconds')
 
 #-----------------------------------------------------------------------
 ## Write log file
-activityLog=' Saleout to DB Successful at '+nowStr+ ' ::  '+ 'Time_use : ',round(DIFFTIMEMIN,2), ' Seconds' +' ******** \n'
+activityLog=' Saleout to DB Successful at '+nowStr+ ' ::  Time_use : '+str(round(DIFFTIMEMIN,2))+ ' Seconds ******** \n'
 
 log_file="SaleoutToDB_"+todayStr
 f = open(file_path+'\\log\\'+log_file, "a")
