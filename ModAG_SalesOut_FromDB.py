@@ -428,8 +428,8 @@ q1 = """
         LEFT JOIN DIM_PRODUCT P ON A.PRD_PARENT_LABEL = P.SKU_LABEL
         WHERE 1=1 --(A.SURVEY_TYPE = 2 OR P.PROD_CATG = 'Beer') -- Filter only Beer
             --AND P.PROD_CATG in ('Beer','Spirits')
-            AND format(A.[DATE],'yyyyMM') >=   '"""+str(twoMonthBeforeStr)+"""'  --'201809'
-            --AND A.[DATE_2] = '201809'
+            --AND format(A.[DATE],'yyyyMM') >=   '201809'
+            AND A.[DATE_2] >= '"""+str(twoMonthBeforeStr)+"""'  --  '201809'
         GROUP BY A.[DATE_2]
             ,A.CUS_CODE
             ,A.CUS_NM
