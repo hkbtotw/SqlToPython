@@ -1,6 +1,7 @@
 import pandas as pd
 import pandasql as ps
 from datetime import datetime, date,  timedelta
+from dateutil.relativedelta import relativedelta
 import math
 import numpy as np
 import pyodbc
@@ -8,10 +9,12 @@ import pyodbc
 start_datetime = datetime.now()
 print (start_datetime,'execute')
 todayStr=date.today().strftime('%Y-%m-%d')
-thisMonthStr=date.today().strftime('%Y%m')
 nowStr=datetime.today().strftime('%Y-%m-%d %H:%M:%S')
 print("TodayStr's date:", todayStr,' -- ',type(todayStr))
 print("nowStr's date:", nowStr,' -- ',type(nowStr))
+
+twoMonthBeforeStr=(date.today()-relativedelta(month=2)).strftime('%Y%m')
+threeMonthBeforeStr=(date.today()-relativedelta(month=3)).strftime('%Y%m')
 
 file_path='C:\\Users\\70018928\\Documents\\Project2021\\Experiment\\SqlFromDataFrame\\'
 
@@ -50,7 +53,7 @@ def ReadDIM_PRODUCT():
     print(' --------- Reading End -------------')
     return dfout
 
-def ReadFCT_SALE_SIS():
+def ReadFCT_SALE_SIS(twoMonthBeforeStr):
     print('------------- Start ReadDB -------------')
     #dfout = pd.DataFrame(columns=['EmployeeId','UserLat','UserLong','DateTimeStamp'])
     # ODBC Driver 17 for SQL Server
@@ -66,8 +69,8 @@ def ReadFCT_SALE_SIS():
 
             SELECT * FROM  [SalesSupport_ETL].[dbo].[FCT_SALE_SIS] 
             WHERE [SOLDTO_CUS_CATEGORY_GRP] = 'Agent / Sub Agent' 
-            --AND SALE_MONTH >= 201809
-            AND SALE_MONTH = 201809
+            AND SALE_MONTH >= '"""+str(twoMonthBeforeStr)+"""' -- 201809
+            --AND SALE_MONTH = 201809 
 
     """
     
@@ -80,7 +83,7 @@ def ReadFCT_SALE_SIS():
     print(' --------- Reading End -------------')
     return dfout
 
-def ReadTemp_ETL_Check_Stock():
+def ReadTemp_ETL_Check_Stock(threeMonthBeforeStr):
     print('------------- Start ReadDB -------------')
     #dfout = pd.DataFrame(columns=['EmployeeId','UserLat','UserLong','DateTimeStamp'])
     # ODBC Driver 17 for SQL Server
@@ -96,9 +99,9 @@ def ReadTemp_ETL_Check_Stock():
 
             SELECT * FROM  [SalesSupport_ETL].[dbo].[Temp_ETL_Check_Stock] 
             WHERE 1=1 
+            AND ([Year]*100)+[Month] >=  '"""+str(threeMonthBeforeStr)+"""'   --201809 -1 
             --AND ([Year]*100)+[Month] >= 201809 -1 
-            AND ([Year]*100)+[Month] >= 201809 -1 
-	        AND ([Year]*100)+[Month] <= 201810 
+	        --AND ([Year]*100)+[Month] <= 201810 
 
     """
     
@@ -111,7 +114,7 @@ def ReadTemp_ETL_Check_Stock():
     print(' --------- Reading End -------------')
     return dfout
 
-def ReadTemp_ETL_SubAgentSales():
+def ReadTemp_ETL_SubAgentSales(twoMonthBeforeStr):
     print('------------- Start ReadDB -------------')
     #dfout = pd.DataFrame(columns=['EmployeeId','UserLat','UserLong','DateTimeStamp'])
     # ODBC Driver 17 for SQL Server
@@ -127,8 +130,8 @@ def ReadTemp_ETL_SubAgentSales():
 
             SELECT * FROM  [SalesSupport_ETL].[dbo].[Temp_ETL_SubAgentSales]
             WHERE 1=1 
-            --AND format([DATE],'yyyyMM') >= '201809'
-            AND format([DATE],'yyyyMM') = '201809'
+            AND format([DATE],'yyyyMM') >=   '"""+str(twoMonthBeforeStr)+"""'  --  '201809'
+            --AND format([DATE],'yyyyMM') = '201809'
 	        
 
     """
@@ -219,13 +222,13 @@ def Write_data_to_database(df_input):
 DIM_PRODUCT=ReadDIM_PRODUCT()
 print(DIM_PRODUCT.columns,' ====  ',len(DIM_PRODUCT), ' ----- ',DIM_PRODUCT.tail(10))
 
-FCT_SALE_SIS=ReadFCT_SALE_SIS()
+FCT_SALE_SIS=ReadFCT_SALE_SIS(twoMonthBeforeStr)
 print(FCT_SALE_SIS.columns,' ====  ',len(FCT_SALE_SIS), ' ----- ',FCT_SALE_SIS.tail(10))
 
-Temp_ETL_Check_Stock=ReadTemp_ETL_Check_Stock()
+Temp_ETL_Check_Stock=ReadTemp_ETL_Check_Stock(threeMonthBeforeStr)
 print(Temp_ETL_Check_Stock.columns,' == temp ==  ',len(Temp_ETL_Check_Stock), ' ----- ',Temp_ETL_Check_Stock.tail(10))
 
-Temp_ETL_SubAgentSales=ReadTemp_ETL_SubAgentSales()
+Temp_ETL_SubAgentSales=ReadTemp_ETL_SubAgentSales(twoMonthBeforeStr)
 print(Temp_ETL_SubAgentSales.columns,' == temp ==  ',len(Temp_ETL_SubAgentSales), ' ----- ',Temp_ETL_SubAgentSales.tail(10))
 
 def ConvertToyyyyMM(x):
@@ -304,8 +307,8 @@ q1 = """
     LEFT JOIN DIM_PRODUCT P on A.PRD_PARENT_LABEL = P.SKU_LABEL
     WHERE A.[SOLDTO_CUS_CATEGORY_GRP] = 'Agent / Sub Agent'  -- filter only TT Channel
     --AND P.PROD_CATG in ('Beer','Spirits') --.PRD_CATEGORY = 'BEER' -- filter only Beer
-    -- AND A.SALE_MONTH >= 201809
-    AND A.SALE_MONTH = 201809
+     AND A.SALE_MONTH >=  '"""+str(twoMonthBeforeStr)+"""'   --201809
+    --AND A.SALE_MONTH = 201809
     -- AND A.[SOLDTO_LABEL] IN ('1002979', '1003175','1007344') TEST FOR หจก.สมพงษ์การสุรา, บจก.นีโอ เอส กรุ๊ป, ร้านโชคดี 4545
     GROUP BY A.[SALE_MONTH]
         ,A.[REGION_SALE_REGION]
@@ -363,9 +366,9 @@ q1 = """
     WHERE 1=1
         --AND P.PROD_CATG in ('Beer','Spirits')
         --(S.SURVEY_TYPE = 2 OR P.PROD_CATG = 'Beer') -- Filter only Beer
-        -- ** AND (S.[Year]*100)+S.[Month] >= 201809 -1 -- เผื่อ begining stock ให้ ลบเพิ่มอีก 1 month (ยังไม่ได้แก้กรณี เดือน 1)
-        AND (S.[Year]*100)+S.[Month] >= 201809 -1 
-	    AND (S.[Year]*100)+S.[Month] <= 201810 
+         AND (S.[Year]*100)+S.[Month] >=  '"""+str(threeMonthBeforeStr)+"""'  --201809 -1 -- เผื่อ begining stock ให้ ลบเพิ่มอีก 1 month (ยังไม่ได้แก้กรณี เดือน 1)
+        --AND (S.[Year]*100)+S.[Month] >= 201809 -1 
+	    --AND (S.[Year]*100)+S.[Month] <= 201810 
     --	AND S.CUS_CODE IN ('0001002979', '0001003175','0001007344', '0682000353','0212000717','0642000124')  --TEST FOR หจก.สมพงษ์การสุรา, บจก.นีโอ เอส กรุ๊ป, ร้านโชคดี 4545
     GROUP BY (S.[Year]*100)+S.[Month]
         ,S.CUS_CODE 
@@ -425,8 +428,8 @@ q1 = """
         LEFT JOIN DIM_PRODUCT P ON A.PRD_PARENT_LABEL = P.SKU_LABEL
         WHERE 1=1 --(A.SURVEY_TYPE = 2 OR P.PROD_CATG = 'Beer') -- Filter only Beer
             --AND P.PROD_CATG in ('Beer','Spirits')
-            --**AND format(A.[DATE],'yyyyMM') >= '201809'
-            AND A.[DATE_2] = '201809'
+            AND format(A.[DATE],'yyyyMM') >=   '"""+str(twoMonthBeforeStr)+"""'  --'201809'
+            --AND A.[DATE_2] = '201809'
         GROUP BY A.[DATE_2]
             ,A.CUS_CODE
             ,A.CUS_NM
@@ -541,7 +544,7 @@ q1 = """
 		LEFT JOIN BUYIN_SUB_Temp INSUB ON I.AGENT_CODE = INSUB.AGENT_CODE AND I.SALE_MONTH = INSUB.YYYYMM AND I.PRD_BRAND = INSUB.PRD_BRAND 
 		
 		WHERE 1=1  --C.CUST_TYPE in ('Agent','Super Sub-agent')
-				AND I.SALE_MONTH = 201809
+				AND I.SALE_MONTH >=  '"""+str(twoMonthBeforeStr)+"""'  -- 201809
 				AND I.ACTL_BUYIN_CASE > 0
 				AND I.AGENT_CODE is not null
 		GROUP BY  I.AGENT_CODE
@@ -710,9 +713,10 @@ Output['collected_at']=nowStr
 
 # check1=Output.copy()
 # check1.to_csv(file_path+'check1.csv')
-
-#datenow=thisMonthStr
-datenow='201809'
+monthStr=(date.today()-relativedelta(month=1)).strftime('%Y%m')
+datenow=monthStr
+print(' ==> ',datenow)
+#datenow='201809'
 
 q1 = """     
 
