@@ -720,7 +720,7 @@ q1 = """
 Output=ps.sqldf(q1, locals())
 print(Output.columns, ' ---Output-- ',len(Output),' :::  ',Output.tail(10))
 
-Output['collect_at']=nowStr
+Output['collected_at']=nowStr
 
 # check1=Output.copy()
 # check1.to_csv(file_path+'check1.csv')
