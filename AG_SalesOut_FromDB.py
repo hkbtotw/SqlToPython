@@ -55,7 +55,7 @@ def ReadDIM_PRODUCT():
     print(' --------- Reading End -------------')
     return dfout
 
-def ReadFCT_SALE_SIS(twoMonthBeforeStr):
+def ReadBUYIN_AGENT():
     print('------------- Start ReadDB -------------')
     #dfout = pd.DataFrame(columns=['EmployeeId','UserLat','UserLong','DateTimeStamp'])
     # ODBC Driver 17 for SQL Server
@@ -68,11 +68,46 @@ def ReadFCT_SALE_SIS(twoMonthBeforeStr):
 
     #- Select data  all records from the table
     sql="""
+    
+    --------------- Step 2: Buy-in Agent / direct sub-agent FILTER ONLY BEER ---------------------------
 
-            SELECT * FROM  [SalesSupport_ETL].[dbo].[FCT_SALE_SIS] 
-            WHERE [SOLDTO_CUS_CATEGORY_GRP] = 'Agent / Sub Agent' 
-            AND SALE_MONTH >= """+str(twoMonthBeforeStr)+""" -- 201809
-            --AND SALE_MONTH = 201809 
+    SELECT A.[SALE_MONTH]
+        ,A.[REGION_SALE_REGION]
+        ,A.[REGION_SALE_PRV] 
+        ,case  A.PRD_CATEGORY when 'BEER' then 'Beer'
+                when 'NonAlcohol' then 'NAB'
+                when 'Spirits' then 'Spirits'
+                else A.PRD_CATEGORY  end as PROD_CATG
+        ,P.[PRD_BRAND]
+        ,A.[SOLDTO_LABEL]
+        ,CASE WHEN A.[SOLDTO_LABEL]  = 'AGENT' THEN A.[SOLDTO_LABEL] ELSE REPLACE(STR(A.[SOLDTO_LABEL],10), ' ','0') END AS AGENT_CODE
+        ,SUM(A.BGT_CASE) AS BG_BEER_CASE
+        ,SUM(A.[ACT_CASE]) as ACTL_BUYIN_CASE
+        ,SUM(CASE WHEN RIGHT(A.[DATE],2) <= 10 THEN A.[ACT_CASE] ELSE 0 END) AS T1_BUYIN_CASE
+        ,SUM(CASE WHEN RIGHT(A.[DATE],2) BETWEEN 11 AND 20 THEN A.[ACT_CASE] ELSE 0 END) AS T2_BUYIN_CASE
+        ,SUM(CASE WHEN RIGHT(A.[DATE],2) > 20 THEN A.[ACT_CASE] ELSE 0 END) AS T3_BUYIN_CASE
+        ,MAX(A.DATE) AS MAX_DATE
+    FROM [SalesSupport_ETL].[dbo].[FCT_SALE_SIS] A
+    LEFT JOIN (SELECT DISTINCT [PRD_PARENT_LABEL] as SKU_LABEL
+        ,case  PRD_CATEGORY when 'BEER' then 'Beer'
+            when 'NonAlcohol' then 'NAB'
+            when 'Spirits' then 'Spirits'
+            else PRD_CATEGORY end as PROD_CATG
+        ,PRD_GROUP	
+        ,PRD_BRAND	
+    FROM [SalesSupport_ETL].[dbo].[FCT_SALE_SIS]) P on A.PRD_PARENT_LABEL = P.SKU_LABEL
+    WHERE A.[SOLDTO_CUS_CATEGORY_GRP] = 'Agent / Sub Agent'  -- filter only TT Channel
+    --AND P.PROD_CATG in ('Beer','Spirits') --.PRD_CATEGORY = 'BEER' -- filter only Beer
+    AND A.SALE_MONTH >= 201809
+    -- AND A.[SOLDTO_LABEL] IN ('1002979', '1003175','1007344') TEST FOR หจก.สมพงษ์การสุรา, บจก.นีโอ เอส กรุ๊ป, ร้านโชคดี 4545
+    GROUP BY A.[SALE_MONTH]
+        ,A.[REGION_SALE_REGION]
+        ,A.[REGION_SALE_PRV]
+        ,A.[SOLDTO_LABEL]
+        ,A.PRD_CATEGORY
+        ,P.[PRD_BRAND]
+    ORDER BY A.[SOLDTO_LABEL],A.[SALE_MONTH]
+
 
     """
     
@@ -85,7 +120,7 @@ def ReadFCT_SALE_SIS(twoMonthBeforeStr):
     print(' --------- Reading End -------------')
     return dfout
 
-def ReadTemp_ETL_Check_Stock(threeMonthBeforeStr):
+def ReadStockDetail():
     print('------------- Start ReadDB -------------')
     #dfout = pd.DataFrame(columns=['EmployeeId','UserLat','UserLong','DateTimeStamp'])
     # ODBC Driver 17 for SQL Server
@@ -98,13 +133,38 @@ def ReadTemp_ETL_Check_Stock(threeMonthBeforeStr):
 
     #- Select data  all records from the table
     sql="""
-
-            SELECT * FROM  [SalesSupport_ETL].[dbo].[Temp_ETL_Check_Stock] 
-            WHERE 1=1 
-            AND ([Year]*100)+[Month] >=  """+str(threeMonthBeforeStr)+"""   --201809 -1 
-            --AND ([Year]*100)+[Month] >= 201809 -1 
-	        --AND ([Year]*100)+[Month] <= 201810 
-
+        SELECT (S.[Year]*100)+S.[Month] AS YYYYMM
+            ,S.CUS_CODE AS CUST_CODE
+            ,S.CUS_NM AS CUST_NAME
+            ,S.CUS_STS_NM AS CUST_TYPE
+            ,P.PROD_CATG
+            ,P.PRD_BRAND
+            ,SUM(CASE WHEN RIGHT(S.[DATE],2) <= 10 THEN S.[ACT_CASE] ELSE 0 END) AS T1_STOCK_CASE
+	        ,SUM(CASE WHEN RIGHT(S.[DATE],2) BETWEEN 11 AND 20 THEN S.[ACT_CASE] ELSE 0 END) AS T2_STOCK_CASE
+	        ,SUM(CASE WHEN RIGHT(S.[DATE],2) > 20 THEN S.[ACT_CASE] ELSE 0 END) AS T3_STOCK_CASE
+            ,MAX(S.DATE) AS MAX_STOCK_DATE
+            --INTO #STOCK_DETAIL
+        FROM (SELECT * FROM  [SalesSupport_ETL].[dbo].[Temp_ETL_Check_Stock] 
+            WHERE 1=1             
+            AND ([Year]*100)+[Month] >= 201809 -1  )  S
+        LEFT JOIN (   SELECT DISTINCT [PRD_PARENT_LABEL] as SKU_LABEL
+                    ,case  PRD_CATEGORY when 'BEER' then 'Beer'
+                    when 'NonAlcohol' then 'NAB'
+                    when 'Spirits' then 'Spirits'
+                    else PRD_CATEGORY end as PROD_CATG
+                    ,PRD_GROUP	
+                    ,PRD_BRAND                    
+                    FROM [SalesSupport_ETL].[dbo].[FCT_SALE_SIS] ) P ON S.PRD_PARENT_LABEL = P.SKU_LABEL
+            WHERE 1=1            
+            AND (S.[Year]*100)+S.[Month] >= 201809 -1             
+        GROUP BY (S.[Year]*100)+S.[Month]
+            ,S.CUS_CODE 
+            ,S.CUS_NM 
+            ,S.CUS_STS_NM
+            ,P.PROD_CATG
+            ,P.PRD_BRAND
+        ORDER BY S.CUS_CODE, YYYYMM
+    
     """
     
     dfout=pd.read_sql(sql,conn)
@@ -116,7 +176,7 @@ def ReadTemp_ETL_Check_Stock(threeMonthBeforeStr):
     print(' --------- Reading End -------------')
     return dfout
 
-def ReadTemp_ETL_SubAgentSales(twoMonthBeforeStr):
+def ReadBuyIn_Sub():
     print('------------- Start ReadDB -------------')
     #dfout = pd.DataFrame(columns=['EmployeeId','UserLat','UserLong','DateTimeStamp'])
     # ODBC Driver 17 for SQL Server
@@ -129,13 +189,41 @@ def ReadTemp_ETL_SubAgentSales(twoMonthBeforeStr):
 
     #- Select data  all records from the table
     sql="""
-
-            SELECT * FROM  [SalesSupport_ETL].[dbo].[Temp_ETL_SubAgentSales]
-            WHERE 1=1 
-            AND format([DATE],'yyyyMM') >=   '"""+str(twoMonthBeforeStr)+"""'  --  '201809'
-            --AND format([DATE],'yyyyMM') = '201809'
-	        
-
+    SELECT format(A.[DATE],'yyyyMM') AS YYYYMM
+            ,P.PROD_CATG
+            ,P.PRD_BRAND
+            ,A.CUS_CODE AS CUST_CODE
+            ,A.CUS_NM AS CUST_NAME 
+            ,A.CUS_STS_NM AS CUST_TYPE
+            ,CASE WHEN A.AGENT_CODE < 10 THEN 'NA'ELSE A.AGENT_CODE END AS AGENT_CODE
+            ,CASE WHEN A.AGENT_CODE < 10 THEN 'NA'ELSE A.AGENT_NM END AS AGENT_NAME
+            ,SUM(ACT_CASE) AS BUYIN_SUB_CASE
+            ,SUM(CASE WHEN RIGHT(A.[DATE],2) <= 10 THEN A.[ACT_CASE] ELSE 0 END) AS T1_BUYIN_SUB_CASE
+            ,SUM(CASE WHEN RIGHT(A.[DATE],2) BETWEEN 11 AND 20 THEN A.[ACT_CASE] ELSE 0 END) AS T2_BUYIN_SUB_CASE
+            ,SUM(CASE WHEN RIGHT(A.[DATE],2) > 20 THEN A.[ACT_CASE] ELSE 0 END) AS T3_BUYIN_SUB_CASE
+            ,MAX(A.DATE) AS MAX_DATE
+        FROM [SalesSupport_ETL].[dbo].[Temp_ETL_SubAgentSales] A
+        LEFT JOIN (SELECT DISTINCT [PRD_PARENT_LABEL] as SKU_LABEL
+            ,case  PRD_CATEGORY when 'BEER' then 'Beer'
+                when 'NonAlcohol' then 'NAB'
+                when 'Spirits' then 'Spirits'
+                else PRD_CATEGORY end as PROD_CATG
+            ,PRD_GROUP	
+            ,PRD_BRAND	
+            FROM [SalesSupport_ETL].[dbo].[FCT_SALE_SIS]) P ON A.PRD_PARENT_LABEL = P.SKU_LABEL
+        WHERE 1=1 --(A.SURVEY_TYPE = 2 OR P.PROD_CATG = 'Beer') -- Filter only Beer
+            --AND P.PROD_CATG in ('Beer','Spirits')
+            AND format(A.[DATE],'yyyyMM') >= '201809'
+        GROUP BY format(A.[DATE],'yyyyMM')
+            ,A.CUS_CODE
+            ,A.CUS_NM
+            ,A.CUS_STS_NM
+            ,P.PROD_CATG
+            ,P.PRD_BRAND
+            ,CASE WHEN A.AGENT_CODE < 10 THEN 'NA'ELSE A.AGENT_CODE END 
+            ,CASE WHEN A.AGENT_CODE < 10 THEN 'NA'ELSE A.AGENT_NM END 
+        ORDER BY A.CUS_CODE, YYYYMM
+  
     """
     
     dfout=pd.read_sql(sql,conn)
@@ -145,6 +233,8 @@ def ReadTemp_ETL_SubAgentSales(twoMonthBeforeStr):
     #dfout.columns=['EmployeeId','UserLat','UserLong','DateTimeStamp']
     del conn, cursor, sql
     print(' --------- Reading End -------------')
+
+
     return dfout
 
 def Write_data_to_database(df_input):
@@ -224,235 +314,19 @@ def Write_data_to_database(df_input):
 DIM_PRODUCT=ReadDIM_PRODUCT()
 print(DIM_PRODUCT.columns,' ====  ',len(DIM_PRODUCT), ' ----- ',DIM_PRODUCT.tail(10))
 
-FCT_SALE_SIS=ReadFCT_SALE_SIS(twoMonthBeforeStr)
-print(FCT_SALE_SIS.columns,' ====  ',len(FCT_SALE_SIS), ' ----- ',FCT_SALE_SIS.tail(10))
+STOCK_DETAIL=ReadStockDetail()
+print(' ===> ',STOCK_DETAIL)
 
-Temp_ETL_Check_Stock=ReadTemp_ETL_Check_Stock(threeMonthBeforeStr)
-print(Temp_ETL_Check_Stock.columns,' == temp ==  ',len(Temp_ETL_Check_Stock), ' ----- ',Temp_ETL_Check_Stock.tail(10))
+BUYIN_SUB=ReadBuyIn_Sub()
+print(' ===> ',BUYIN_SUB)
 
-Temp_ETL_SubAgentSales=ReadTemp_ETL_SubAgentSales(twoMonthBeforeStr)
-print(Temp_ETL_SubAgentSales.columns,' == temp ==  ',len(Temp_ETL_SubAgentSales), ' ----- ',Temp_ETL_SubAgentSales.tail(10))
+BUYIN_AGENT=ReadBUYIN_AGENT()
+print( ' BIA ===>', BUYIN_AGENT)
 
-def ConvertToyyyyMM(x):
-    stringMM=x[5:7]
-    stringYY=x[0:4]    
-    return stringYY+stringMM
-
-#df['REC_DATE_2']=df.apply(lambda x: ConvertToyyyyMM(x['REC_DATE']),axis=1)
-
-# pandasql does not have right()  and str() function need to manually convert column before using sql
-def ConvertAGENT_CODE(x):
-    prefix=''
-    def patchzero(lenIn):
-        patchString=''
-        for n in range(lenIn):
-            patchString=patchString+'0'
-        return patchString
-    if(x=='AGENT'):
-        stringout=x
-    else:
-        xlen=len(x)
-        if(xlen==10):
-            stringout=x
-        else:
-            xdiff=10-xlen
-            prefix=patchzero(xdiff)
-            stringout=prefix+x
-    return stringout
-
-def SetT1Group(x, y):
-    if(int(x[6:len(x)])<=10):
-        return y
-    else:
-        return 0
-def SetT2Group(x, y):
-    if((int(x[6:len(x)])>=11) and (int(x[6:len(x)])<=20)) :
-        return y
-    else:
-        return 0
-def SetT3Group(x, y):
-    if(int(x[6:len(x)])>20):
-        return y
-    else:
-        return 0
-
-FCT_SALE_SIS['AGENT_CODE']=FCT_SALE_SIS.apply(lambda x: ConvertAGENT_CODE(x['SOLDTO_LABEL']),axis=1)
-FCT_SALE_SIS['T1']=FCT_SALE_SIS.apply(lambda x: SetT1Group(x['DATE'],x['ACT_CASE']),axis=1)
-FCT_SALE_SIS['T2']=FCT_SALE_SIS.apply(lambda x: SetT2Group(x['DATE'],x['ACT_CASE']),axis=1)
-FCT_SALE_SIS['T3']=FCT_SALE_SIS.apply(lambda x: SetT3Group(x['DATE'],x['ACT_CASE']),axis=1)
-
-q1 = """
-    SELECT A.[SALE_MONTH]
-        ,A.[REGION_SALE_REGION]
-        ,A.[REGION_SALE_PRV] 
-        ,case  A.PRD_CATEGORY when 'BEER' then 'Beer'
-                when 'NonAlcohol' then 'NAB'
-                when 'Spirits' then 'Spirits'
-                else A.PRD_CATEGORY  end as PROD_CATG
-        ,P.[PRD_BRAND]
-        ,A.[SOLDTO_LABEL]
-        --,CASE WHEN A.[SOLDTO_LABEL]  = 'AGENT' THEN A.[SOLDTO_LABEL] ELSE REPLACE(STR(A.[SOLDTO_LABEL],10), ' ','0') END AS AGENT_CODE
-        ,A.[AGENT_CODE]
-        ,SUM(A.BGT_CASE) AS BG_BEER_CASE
-        ,SUM(A.[ACT_CASE]) as ACTL_BUYIN_CASE
-        ,SUM(A.[T1]) AS T1_BUYIN_CASE
-        ,SUM(A.[T2]) AS T2_BUYIN_CASE
-        ,SUM(A.[T3]) AS T3_BUYIN_CASE
-        ,MAX(A.DATE) AS MAX_DATE
-        ,A.DATE 
-        ,A.T1
-        ,A.T2
-        ,A.T3
-        ,A.ACT_CASE
-        
-    FROM FCT_SALE_SIS A
-    LEFT JOIN DIM_PRODUCT P on A.PRD_PARENT_LABEL = P.SKU_LABEL
-    WHERE A.[SOLDTO_CUS_CATEGORY_GRP] = 'Agent / Sub Agent'  -- filter only TT Channel
-    --AND P.PROD_CATG in ('Beer','Spirits') --.PRD_CATEGORY = 'BEER' -- filter only Beer
-     AND A.SALE_MONTH >=  """+str(twoMonthBeforeStr)+"""   --201809
-    --AND A.SALE_MONTH = 201809
-    -- AND A.[SOLDTO_LABEL] IN ('1002979', '1003175','1007344') TEST FOR หจก.สมพงษ์การสุรา, บจก.นีโอ เอส กรุ๊ป, ร้านโชคดี 4545
-    GROUP BY A.[SALE_MONTH]
-        ,A.[REGION_SALE_REGION]
-        ,A.[REGION_SALE_PRV]
-        ,A.[SOLDTO_LABEL]
-        ,A.PRD_CATEGORY
-        ,P.[PRD_BRAND]
-    ORDER BY A.[SOLDTO_LABEL],A.[SALE_MONTH]
-    """
-
-BUYIN_AGENT=ps.sqldf(q1, locals())
-print(BUYIN_AGENT.columns, ' ----- ',len(BUYIN_AGENT),' :::  ',BUYIN_AGENT.tail(10))
-
-# check=BUYIN_AGENT[['AGENT_CODE','SOLDTO_LABEL','DATE','ACT_CASE','T1','T2','T3','ACTL_BUYIN_CASE','T1_BUYIN_CASE','T2_BUYIN_CASE','T3_BUYIN_CASE']]
-# print(check)
-# check.to_csv(file_path+'check.csv')
-
-def SetT1Group_2(x, y):
-    if(int(x[8:len(x)])<=10):
-        return y
-    else:
-        return 0
-def SetT2Group_2(x, y):
-    if((int(x[8:len(x)])>=11) and (int(x[8:len(x)])<=20)) :
-        return y
-    else:
-        return 0
-def SetT3Group_2(x, y):
-    if(int(x[8:len(x)])>20):
-        return y
-    else:
-        return 0
-
-Temp_ETL_Check_Stock['T1']=Temp_ETL_Check_Stock.apply(lambda x: SetT1Group_2(x['DATE'],x['ACT_CASE']),axis=1)
-Temp_ETL_Check_Stock['T2']=Temp_ETL_Check_Stock.apply(lambda x: SetT2Group_2(x['DATE'],x['ACT_CASE']),axis=1)
-Temp_ETL_Check_Stock['T3']=Temp_ETL_Check_Stock.apply(lambda x: SetT3Group_2(x['DATE'],x['ACT_CASE']),axis=1)
-
-q1 = """
-    SELECT (S.[Year]*100)+S.[Month] AS YYYYMM
-        ,S.CUS_CODE AS CUST_CODE
-        ,S.CUS_NM AS CUST_NAME
-        ,S.CUS_STS_NM AS CUST_TYPE
-        ,P.PROD_CATG
-        ,P.PRD_BRAND
-        ,SUM(S.T1) AS T1_STOCK_CASE
-        ,SUM(S.T2) AS T2_STOCK_CASE
-        ,SUM(S.T3) AS T3_STOCK_CASE
-        ,MAX(S.DATE) AS MAX_STOCK_DATE
-        --,S.T1
-        --,S.T2
-        --,S.T3
-        --INTO #STOCK_DETAIL
-    FROM Temp_ETL_Check_Stock  S
-    LEFT JOIN DIM_PRODUCT P ON S.PRD_PARENT_LABEL = P.SKU_LABEL
-    WHERE 1=1
-        --AND P.PROD_CATG in ('Beer','Spirits')
-        --(S.SURVEY_TYPE = 2 OR P.PROD_CATG = 'Beer') -- Filter only Beer
-         AND (S.[Year]*100)+S.[Month] >=  """+threeMonthBeforeStr+"""  --201809 -1 -- เผื่อ begining stock ให้ ลบเพิ่มอีก 1 month (ยังไม่ได้แก้กรณี เดือน 1)
-        --AND (S.[Year]*100)+S.[Month] >= 201809 -1 
-	    --AND (S.[Year]*100)+S.[Month] <= 201810 
-    --	AND S.CUS_CODE IN ('0001002979', '0001003175','0001007344', '0682000353','0212000717','0642000124')  --TEST FOR หจก.สมพงษ์การสุรา, บจก.นีโอ เอส กรุ๊ป, ร้านโชคดี 4545
-    GROUP BY (S.[Year]*100)+S.[Month]
-        ,S.CUS_CODE 
-        ,S.CUS_NM 
-        ,S.CUS_STS_NM
-        ,P.PROD_CATG
-        ,P.PRD_BRAND
-    ORDER BY S.CUS_CODE, YYYYMM
-    
-    """
-
-STOCK_DETAIL=ps.sqldf(q1, locals())
-print(STOCK_DETAIL.columns, ' ----- ',len(STOCK_DETAIL),' :::  ',STOCK_DETAIL.tail(10))
-# check=STOCK_DETAIL[['YYYYMM','CUST_CODE','T1','T2','T3','T1_STOCK_CASE','T2_STOCK_CASE','T3_STOCK_CASE']]
-# print(check)
-# check.to_csv(file_path+'check.csv')
-
-def ScreenAgentCode_TempETLSubagentSales(x):
-    if(x =='' or x is None):
-        return 'NA'
-    else:         
-        if(len(x)<10):
-            return 'NA'
-        else:
-            return x
-def ScreenAgentCode_TempETLSubagentSales_2(x,y):
-    if(x =='' or x is None):
-        return 'NA'
-    else:                 
-        if(len(x)<10):
-            return 'NA'
-        else:
-            return y
-
-Temp_ETL_SubAgentSales['DATE_2']=Temp_ETL_SubAgentSales.apply(lambda x: ConvertToyyyyMM(x['DATE']),axis=1)
-Temp_ETL_SubAgentSales['T1']=Temp_ETL_SubAgentSales.apply(lambda x: SetT1Group_2(x['DATE'],x['ACT_CASE']),axis=1)
-Temp_ETL_SubAgentSales['T2']=Temp_ETL_SubAgentSales.apply(lambda x: SetT2Group_2(x['DATE'],x['ACT_CASE']),axis=1)
-Temp_ETL_SubAgentSales['T3']=Temp_ETL_SubAgentSales.apply(lambda x: SetT3Group_2(x['DATE'],x['ACT_CASE']),axis=1)
-Temp_ETL_SubAgentSales['AGENT_CODE']=Temp_ETL_SubAgentSales.apply(lambda x: ScreenAgentCode_TempETLSubagentSales(x['AGENT_CODE']),axis=1)
-Temp_ETL_SubAgentSales['AGENT_NAME']=Temp_ETL_SubAgentSales.apply(lambda x: ScreenAgentCode_TempETLSubagentSales_2(x['AGENT_CODE'],x['AGENT_NM']),axis=1)
-q1 = """
-        SELECT A.[DATE_2] AS YYYYMM
-            ,P.PROD_CATG
-            ,P.PRD_BRAND
-            ,A.CUS_CODE AS CUST_CODE
-            ,A.CUS_NM AS CUST_NAME 
-            ,A.CUS_STS_NM AS CUST_TYPE
-            ,A.AGENT_CODE
-            ,A.AGENT_NAME
-            ,SUM(ACT_CASE) AS BUYIN_SUB_CASE
-            ,SUM(A.T1) AS T1_BUYIN_SUB_CASE
-            ,SUM(A.T2) AS T2_BUYIN_SUB_CASE
-            ,SUM(A.T3) AS T3_BUYIN_SUB_CASE
-            ,MAX(A.DATE) AS MAX_DATE
-        --INTO #BUYIN_SUB
-        FROM Temp_ETL_SubAgentSales A
-        LEFT JOIN DIM_PRODUCT P ON A.PRD_PARENT_LABEL = P.SKU_LABEL
-        WHERE 1=1 --(A.SURVEY_TYPE = 2 OR P.PROD_CATG = 'Beer') -- Filter only Beer
-            --AND P.PROD_CATG in ('Beer','Spirits')
-            --AND format(A.[DATE],'yyyyMM') >=   '201809'
-            AND A.[DATE_2] >= '"""+str(twoMonthBeforeStr)+"""'  --  '201809'
-        GROUP BY A.[DATE_2]
-            ,A.CUS_CODE
-            ,A.CUS_NM
-            ,A.CUS_STS_NM
-            ,P.PROD_CATG
-            ,P.PRD_BRAND
-            ,A.AGENT_CODE 
-            ,A.AGENT_NM 
-        ORDER BY A.CUS_CODE, YYYYMM
-    
-    """
-
-BUYIN_SUB=ps.sqldf(q1, locals())
-print(BUYIN_SUB.columns, ' ----- ',len(BUYIN_SUB),' :::  ',BUYIN_SUB.tail(10))
-# check=BUYIN_SUB.copy()
-# check.to_csv(file_path+'check.csv')
 
 q1 = """
 
         SELECT A.CUST_CODE, A.CUST_NAME, A.CUST_TYPE, B.AGENT_CODE
-        --INTO #DIM_CUSTOMER
         FROM
             (select YYYYMM, CUST_CODE, CUST_NAME
             ,case when CUST_TYPE not in ('Agent','Super Sub-agent') then 'Sub-agent' else CUST_TYPE end as CUST_TYPE
@@ -546,7 +420,8 @@ q1 = """
 		LEFT JOIN BUYIN_SUB_Temp INSUB ON I.AGENT_CODE = INSUB.AGENT_CODE AND I.SALE_MONTH = INSUB.YYYYMM AND I.PRD_BRAND = INSUB.PRD_BRAND 
 		
 		WHERE 1=1  --C.CUST_TYPE in ('Agent','Super Sub-agent')
-				AND I.SALE_MONTH >=  """+str(twoMonthBeforeStr)+"""  -- 201809
+				--AND I.SALE_MONTH >=  """+str(twoMonthBeforeStr)+"""  -- 201809
+                AND I.SALE_MONTH >=  201809
 				AND I.ACTL_BUYIN_CASE > 0
 				AND I.AGENT_CODE is not null
 		GROUP BY  I.AGENT_CODE
@@ -565,6 +440,8 @@ AGENT_DETL_Temp=ps.sqldf(q1, locals())
 print(AGENT_DETL_Temp.columns, ' ---AG DT Temp-- ',len(AGENT_DETL_Temp),' :::  ',AGENT_DETL_Temp.tail(10))
 # check1=AGENT_DETL_Temp.copy()
 # check1.to_csv(file_path+'check.csv')
+
+del DIM_PRODUCT, BUYIN_AGENT, STOCK_DETAIL, BUYIN_SUB, BEG_STOCK_temp, BUYIN_SUB_Temp
 
 def checknull(tin):
     if(tin is None):
@@ -651,6 +528,8 @@ q1 = """
 AGENT_DETL=ps.sqldf(q1, locals())
 print(AGENT_DETL.columns, ' ---AG DT-- ',len(AGENT_DETL),' :::  ',AGENT_DETL.tail(10))
 
+del AGENT_DETL_Temp
+
 # AGENT_DETL.reset_index().T.drop_duplicates().T
 # print(AGENT_DETL.columns, ' ---AG DT - 2 -- ',len(AGENT_DETL),' :::  ',AGENT_DETL.tail(10))
 # check1=AGENT_DETL.copy()
@@ -682,6 +561,8 @@ def CreateSale_Out_Agent_Other_Flg(x, y):
 AGENT_DETL['PROVINCE']=AGENT_DETL.apply(lambda x: ParseProvinceName(x['REGION_SALE_PRV']),axis=1 )
 AGENT_DETL['SALE_OUT_AGENT_OTHER']=AGENT_DETL.apply(lambda x: CreateSale_Out_Agent_Other(x['AG_SALE_OUT'],x['SUB_BUY_IN']),axis=1 )
 AGENT_DETL['AG_SALE_OUT_OTHER_FLG']=AGENT_DETL.apply(lambda x: CreateSale_Out_Agent_Other_Flg(x['AG_SALE_OUT'],x['SUB_BUY_IN']),axis=1 )
+
+
 
 q1 = """
     SELECT A.YYYYMM AS YEAR_MONTH
@@ -751,9 +632,9 @@ print(dfResult.columns, ' ---Result-- ',len(dfResult),' :::  ',dfResult.tail(10)
 check1=dfResult.copy()
 check1.to_csv(file_path+'check1.csv')
 
-#Write_data_to_database(dfResult)
+Write_data_to_database(dfResult)
 
-del DIM_PRODUCT, FCT_SALE_SIS, Temp_ETL_Check_Stock, Temp_ETL_SubAgentSales, BUYIN_AGENT, STOCK_DETAIL, BUYIN_SUB, DIM_CUSTOMER, BEG_STOCK_temp, BUYIN_SUB_Temp, AGENT_DETL_Temp, AGENT_DETL, Output, dfResult
+del AGENT_DETL, Output, dfResult, DIM_CUSTOMER
 
 ###****************************************************************
 end_datetime = datetime.now()
@@ -763,7 +644,7 @@ DIFFTIME = end_datetime - start_datetime
 DIFFTIMEMIN = DIFFTIME.total_seconds()
 print('Time_use : ',round(DIFFTIMEMIN,2), ' Seconds')
 
-#-----------------------------------------------------------------------
+##-----------------------------------------------------------------------
 ## Write log file
 activityLog=' Saleout to DB Successful at '+nowStr+ ' ::  Time_use : '+str(round(DIFFTIMEMIN,2))+ ' Seconds ******** \n'
 
